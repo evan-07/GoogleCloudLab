@@ -1,15 +1,22 @@
 # Create and Manage Cloud Resources: Challenge Lab
 ## Define General variables
-PROJECT=qwiklabs-gcp-00-8f0581fe4999
-INSTANCE=nucleus-jumphost-565
-APP_PORT=8080
-FIREWALL_RULE=permit-tcp-rule-785
+PROJECT=qwiklabs-gcp-00-d10a3ac8794d
+INSTANCE=nucleus-jumphost-132
+APP_PORT=8081
+FIREWALL_RULE=allow-tcp-rule-212
 MACHINE_TYPE=f1-micro
 ZONE=asia-east1-a
+VPC_NAME=nucleus-vpc
 
 #****** TASK #1
 ## Create compute instance
-gcloud compute instances create $INSTANCE --machine-type $MACHINE_TYPE
+gcloud compute instances create $INSTANCE \
+  --network $VPC_NAME \
+  --zone $ZONE  \
+  --machine-type $MACHINE_TYPE \
+  --image-family debian-11 \
+  --image-project debian-cloud
+
 ## Once task is verified, delete the compute instance
 gcloud compute instances delete $INSTANCE --zone $ZONE
 #---------------------------------------------------------------------------
@@ -21,7 +28,7 @@ CON_ZONE=us-east1-b
 CON_CLUSTER_NAME=cluster1
 DEPLOYMENT_NAME=hello-app
 DEPLOYMENT_IMAGE=gcr.io/google-samples/hello-app:2.0
-SERVICE_NAME=${DEPLOYMENT_NAME}_SERVICE
+SERVICE_NAME=${DEPLOYMENT_NAME}-service
 
 ## Create container cluster
 gcloud container clusters create --machine-type=$CON_MACHINE_TYPE --zone=$CON_ZONE $CON_CLUSTER_NAME
@@ -46,65 +53,72 @@ gcloud container clusters delete $CON_CLUSTER_NAME --zone=$CON_ZONE
 
 #****** TASK #3
 ## Define variables
-INSTANCE_TEMPLATE_NAME=lb-backend-template
-INSTANCE_GROUP_NAME=lb-backend-group
+INSTANCE_TEMPLATE_NAME=web-server-template
+INSTANCE_GROUP_NAME=web-server-group
 INSTANCE_GROUP_SIZE=2
-FW_HEALTH_CHECK=fw-allow-health-check
+FW_HEALTH_CHECK=web-server-fw
 EXTERNAL_IP=lb-ipv4-1
 HTTP_PROXY=http-lb-proxy
 URL_MAP=web-map-http
 BACKEND_SERVICE=web-backend-service
 HTTP_HEALTH_CHECK=http-basic-check
+ZONE=asia-east1-a
+VPC_NAME=nucleus-vpc
+
+cat << EOF > startup.sh
+#! /bin/bash
+apt-get update
+apt-get install -y nginx
+service nginx start
+sed -i — ‘s/nginx/Google Cloud Platform — ‘“\$HOSTNAME”’/’ /var/www/html/index.nginx-debian.html
+EOF
 
 ## Create a Load Balancer Template
 gcloud compute instance-templates create $INSTANCE_TEMPLATE_NAME \
-   #--region= \
-   --network=default \
-   --subnet=default \
-   --tags=allow-health-check \
+   --network=$VPC_NAME \
    --machine-type=$MACHINE_TYPE \
    --image-family=debian-11 \
    --image-project=debian-cloud \
-   --metadata=startup-script='#! /bin/bash
-      apt-get update
-      apt-get install -y nginx
-      service nginx start
-      sed -i -- 's/nginx/Google Cloud Platform - '"\$HOSTNAME"'/' /var/www/html/index.nginx-debian.html'
+   --metadata-from-file startup-script=startup.sh
 
 ## Create a managed instance group based on the template
 gcloud compute instance-groups managed create $INSTANCE_GROUP_NAME \
    --template=$INSTANCE_TEMPLATE_NAME \
+   --base-instance-name web-server \
    --size=$INSTANCE_GROUP_SIZE \
    --zone=$ZONE
 
 ## Create a firewall rule
 gcloud compute firewall-rules create $FW_HEALTH_CHECK \
-  --network=default \
+  --network=$VPC_NAME \
   --action=allow \
   --direction=ingress \
-  --source-ranges=130.211.0.0/22,35.191.0.0/16 \
-  --target-tags=allow-health-check \
   --rules=tcp:80
 
+## Create a health check for the load balancer
+gcloud compute http-health-checks create $HTTP_HEALTH_CHECK
+
+gcloud compute instance-groups managed \
+  set-named-ports $INSTANCE_GROUP_NAME \
+  --named-ports http:80 \
+  --zone=$ZONE
+
 ## Set up a global static external IP
-gcloud compute addresses create $EXTERNAL_IP \
-  --ip-version=IPV4 \
-  --global
+#gcloud compute addresses create $EXTERNAL_IP \
+# --ip-version=IPV4 \
+# --global
 
 ## Save the IPv4 address
-gcloud compute addresses describe $EXTERNAL_IP \
-  --format="get(address)" \
-  --global
+#IPADDRESS=$(gcloud compute addresses describe $EXTERNAL_IP \
+#  --format="get(address)" \
+#  --global)
 
-## Create a health check for the load balancer
-gcloud compute health-checks create http $HTTP_HEALTH_CHECK \
-  --port 80
+
 
 ## Create a backend service
 gcloud compute backend-services create $BACKEND_SERVICE \
   --protocol=HTTP \
-  --port-name=http \
-  --health-checks=$HTTP_HEALTH_CHECK \
+  --http-health-checks=$HTTP_HEALTH_CHECK \
   --global
 
 ## Add instance group to the backend service
@@ -123,7 +137,7 @@ gcloud compute target-http-proxies create $HTTP_PROXY \
 
 ## Create a global forwarding rule to route incoming requests to the proxy
 gcloud compute forwarding-rules create http-content-rule \
-    --address=$EXTERNAL_IP \
     --global \
     --target-http-proxy=$HTTP_PROXY \
     --ports=80
+gcloud compute forwarding-rules list

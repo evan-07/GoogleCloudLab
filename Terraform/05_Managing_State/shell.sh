@@ -1,0 +1,1 @@
+export projectid=$(gcloud config list --format 'value(core.project)')

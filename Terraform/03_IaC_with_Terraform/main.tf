@@ -44,7 +44,7 @@ resource "google_compute_address" "vm_static_ip" {
 
 # New resource for the storage bucket our application will use.
 resource "google_storage_bucket" "example_bucket" {
-  name     = "{var.project}_bucket"
+  name     = "${var.project}_bucket"
   location = "US"
   website {
     main_page_suffix = "index.html"

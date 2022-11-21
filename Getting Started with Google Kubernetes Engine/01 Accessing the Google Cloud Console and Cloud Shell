@@ -1,0 +1,68 @@
+MY_BUCKET_NAME_1=[BUCKET_NAME]
+MY_BUCKET_NAME_2=[BUCKET_NAME_2]
+MY_REGION=us-central1
+
+### Create bucket
+gsutil mb gs://$MY_BUCKET_NAME_2
+
+### Create second virtual machine
+#### Define variables
+gcloud compute zones list | grep $MY_REGION
+MY_ZONE=[ZONE]
+gcloud config set compute/zone $MY_ZONE
+MY_VMNAME=second-vm
+#### Create VM
+gcloud compute instances create $MY_VMNAME \
+--machine-type "e2-standard-2" \
+--image-project "debian-cloud" \
+--image-family "debian-11" \
+--subnet "default"
+#### List VMs
+gcloud compute instances list
+
+
+### Create Service Account named 
+gcloud iam service-accounts create [service-account-name]] --display-name "test-service-account2"
+
+### Grant Project Viewer role to Service Account
+gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT --member serviceAccount:test-service-account2@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com --role roles/viewer
+
+### Download file to Cloud Shell and copy to Cloud Shell
+gsutil cp gs://cloud-training/ak8s/cat.jpg cat.jpg
+
+### Copy file into a bucket
+gsutil cp cat.jpg gs://$MY_BUCKET_NAME_1
+gsutil cp gs://$MY_BUCKET_NAME_1/cat.jpg gs://$MY_BUCKET_NAME_2/cat.jpg
+
+### Set access control list for a Cloud Storage object
+#### Get the ACL permissions of an object and save on acl.txt
+gsutil acl get gs://$MY_BUCKET_NAME_1/cat.jpg  > acl.txt
+cat acl.txt
+#### Set the ACL permission of object to private
+gsutil acl set private gs://$MY_BUCKET_NAME_1/cat.jpg
+
+
+### Authenticate as a service account
+gcloud config list
+gcloud auth activate-service-account --key-file credentials.json
+
+### Make a cloud storage bucket readable by everyone
+gsutil iam ch allUsers:objectViewer gs://$MY_BUCKET_NAME_1
+
+
+### Basic NGINX installation in a debian machine
+sudo apt-get remove -y --purge man-db
+sudo touch /var/lib/man-db/auto-update
+sudo apt-get update
+sudo apt-get install nginx
+
+### Copy a file from cloud shell to the debian VM
+gcloud compute scp index.html first-vm:index.nginx-debian.html --zone=us-central1-c
+sudo cp index.nginx-debian.html /var/www/html
+
+### Sample html file to be used as an index.html
+<html><head><title>Cat</title></head>
+<body>
+<h1>Cat</h1>
+<img src="REPLACE_WITH_CAT_URL">
+</body></html>

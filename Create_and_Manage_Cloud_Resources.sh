@@ -1,17 +1,17 @@
 # Create and Manage Cloud Resources: Challenge Lab
 ## Define General variables
-PROJECT=qwiklabs-gcp-00-d10a3ac8794d
-INSTANCE=nucleus-jumphost-132
-APP_PORT=8081
-FIREWALL_RULE=allow-tcp-rule-212
+PROJECT=qwiklabs-gcp-02-f3e0136c2a45
+INSTANCE=nucleus-jumphost-970
+APP_PORT=8083
+FIREWALL_RULE=permit-tcp-rule-645
 MACHINE_TYPE=f1-micro
-ZONE=asia-east1-a
+ZONE=us-central1-c
 VPC_NAME=nucleus-vpc
 
 #****** TASK #1
 ## Create compute instance
 gcloud compute instances create $INSTANCE \
-  --network $VPC_NAME \
+  --network default \
   --zone $ZONE  \
   --machine-type $MACHINE_TYPE \
   --image-family debian-11 \
@@ -24,7 +24,7 @@ gcloud compute instances delete $INSTANCE --zone $ZONE
 #****** TASK #2
 ## Define variables
 CON_MACHINE_TYPE=n1-standard-1
-CON_ZONE=us-east1-b
+CON_ZONE=us-east1-c
 CON_CLUSTER_NAME=cluster1
 DEPLOYMENT_NAME=hello-app
 DEPLOYMENT_IMAGE=gcr.io/google-samples/hello-app:2.0
